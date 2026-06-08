@@ -1,5 +1,10 @@
 /* X11 specific code and features */
 
+/* This translation unit only contains X11 functionality. When GLava is built
+   without any X11 backend (e.g. a pure-Wayland build) the implementation below
+   is replaced with no-op stubs so the renderer still links. */
+#if defined(GLAVA_GLX) || defined(GLAVA_GLFW)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -470,3 +475,38 @@ unsigned int xwin_copyglbg(struct glava_renderer* rd, unsigned int tex) {
     
     return texture;
 }
+
+#else /* no X11 backend: provide no-op stubs */
+
+#include <stdbool.h>
+
+#include "render.h"
+#include "xwin.h"
+
+void xwin_assign_icon_bmp(struct gl_wcb* wcb, void* impl, const char* path) {
+    (void) wcb; (void) impl; (void) path;
+}
+bool xwin_should_render(struct gl_wcb* wcb, void* impl) {
+    (void) wcb; (void) impl; return true;
+}
+void xwin_wait_for_wm(void) {}
+bool xwin_settype(struct gl_wcb* wcb, void* impl, const char* type) {
+    (void) wcb; (void) impl; (void) type; return false;
+}
+void xwin_setdesktop(struct gl_wcb* wcb, void* impl, unsigned long desktop) {
+    (void) wcb; (void) impl; (void) desktop;
+}
+void xwin_addstate(struct gl_wcb* wcb, void* impl, const char* state) {
+    (void) wcb; (void) impl; (void) state;
+}
+unsigned int xwin_copyglbg(struct glava_renderer* rd, unsigned int texture) {
+    (void) rd; return texture;
+}
+Window* xwin_get_desktop_layer(struct gl_wcb* wcb) {
+    (void) wcb; return NULL;
+}
+const char* xwin_detect_wm(struct gl_wcb* wcb) {
+    (void) wcb; return NULL;
+}
+
+#endif /* X11 backend present */

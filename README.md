@@ -3,6 +3,8 @@
 
 **GLava** is a general-purpose, highly configurable OpenGL audio spectrum visualizer for X11. Displayed to the left is the `radial` shader module, or for a more extensive demonstration [see this demo](https://streamable.com/dgpj8). Development is active, and reporting issues is encouranged.
 
+> **Wayland / Hyprland:** an experimental native Wayland backend (EGL + `wlr-layer-shell`) renders GLava as a click-through desktop-background layer on wlroots-based compositors such as Hyprland. Build with `-Denable_wayland=true`. See [docs/WAYLAND.md](docs/WAYLAND.md) for full build, usage, and uninstall instructions.
+
 **Compiling:**
 
 ```bash

@@ -82,7 +82,7 @@ static void* block_storage;
 #endif
 
 bool glad_instantiated = false;
-struct gl_wcb* wcbs[2] = {};
+struct gl_wcb* wcbs[3] = {};
 static size_t wcbs_idx = 0;
 
 static inline void register_wcb(struct gl_wcb* wcb) { wcbs[wcbs_idx++] = wcb; }
@@ -870,7 +870,9 @@ struct glava_renderer* rd_new(const char**    paths,        const char* entry,
                               bool            auto_desktop, bool        verbose,
                               bool            test_mode) {
     
-    xwin_wait_for_wm();
+    /* Waiting on an EWMH window manager only applies to X11 sessions. */
+    if (!getenv("WAYLAND_DISPLAY"))
+        xwin_wait_for_wm();
     
     MUTABLE glava_renderer* r = malloc(sizeof(struct glava_renderer));
     *r = (struct glava_renderer) {
@@ -964,6 +966,9 @@ struct glava_renderer* rd_new(const char**    paths,        const char* entry,
         #ifdef GLAVA_GLX
         DECL_WCB(wcb_glx);
         #endif
+        #ifdef GLAVA_WAYLAND
+        DECL_WCB(wcb_wayland);
+        #endif
     }
     
     #ifdef GLAVA_GLFW
@@ -973,6 +978,14 @@ struct glava_renderer* rd_new(const char**    paths,        const char* entry,
     #ifdef GLAVA_GLX
     if (!forced && getenv("DISPLAY")) {
         backend = "glx";
+    }
+    #endif
+    
+    #ifdef GLAVA_WAYLAND
+    /* Prefer the native Wayland backend when running in a Wayland session.
+       Checked last so it takes priority over GLX (Xwayland also sets DISPLAY). */
+    if (!forced && getenv("WAYLAND_DISPLAY")) {
+        backend = "wayland";
     }
     #endif
     
@@ -1442,6 +1455,20 @@ struct glava_renderer* rd_new(const char**    paths,        const char* entry,
         glava_abort();
     }
     
+    /* The Wayland backend uses native compositor transparency and layer-shell
+       surfaces, so the X11-only desktop-mirroring and EWMH features do not
+       apply. Disable them so those code paths are never taken. */
+    bool wayland_backend = !strcmp(gl->wcb->name, "wayland");
+    if (wayland_backend) {
+        if (gl->copy_desktop) {
+            if (verbose)
+                printf("Wayland backend: 'xroot' opacity is unsupported; "
+                       "using native compositor transparency instead\n");
+            gl->copy_desktop = false;
+        }
+        gl->check_fullscreen = false;
+    }
+
     gl->w = gl->wcb->create_and_bind(
         wintitle, "GLava", xwintype, (const char**) xwinstates, xwinstates_sz,
         gl->geometry[2], gl->geometry[3], gl->geometry[0], gl->geometry[1],
@@ -1455,7 +1482,8 @@ struct glava_renderer* rd_new(const char**    paths,        const char* entry,
     if (xwinstates) free(xwinstates);
     if (wintitle && wintitle != wintitle_default) free(wintitle);
 
-    xwin_assign_icon_bmp(gl->wcb, gl->w, GLAVA_RESOURCE_PATH "/glava.bmp");
+    if (!wayland_backend)
+        xwin_assign_icon_bmp(gl->wcb, gl->w, GLAVA_RESOURCE_PATH "/glava.bmp");
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_DEPTH_CLAMP);

@@ -2,6 +2,10 @@ option('enable_glfw', type: 'boolean', value: false,
        description: 'Enable legacy GLFW backend')
 option('disable_glx', type: 'boolean', value: false,
        description: 'Disable GLX backend')
+option('enable_wayland', type: 'boolean', value: false,
+       description: 'Enable native Wayland backend (EGL + wlr-layer-shell)')
+option('wlr_layer_shell_xml', type: 'string', value: '',
+       description: 'Path to wlr-layer-shell-unstable-v1.xml (defaults to the vendored copy)')
 option('standalone', type: 'boolean', value: false,
        description: 'Configure build to run without installation')
 option('glad', type: 'boolean', value: false,

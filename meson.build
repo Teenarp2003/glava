@@ -23,10 +23,16 @@ glava_dependencies = [
   cc.find_library('pulse'),
   cc.find_library('pulse-simple'),
   cc.find_library('dl'),
-  cc.find_library('m'),
-  cc.find_library('X11'),
-  cc.find_library('Xext')
+  cc.find_library('m')
 ]
+
+# X11 is only needed by the GLX and (legacy) GLFW backends. Gate it so a
+# pure-Wayland build does not require Xlib to be installed.
+need_x11 = (not get_option('disable_glx')) or get_option('enable_glfw')
+if need_x11
+  glava_dependencies += cc.find_library('X11')
+  glava_dependencies += cc.find_library('Xext')
+endif
 
 if cc.get_id() == 'clang'
   add_project_arguments('-fblocks', language: 'c')
@@ -60,6 +66,47 @@ if not get_option('disable_glx')
   glava_dependencies += cc.find_library('Xrender')
 endif
 
+# Native Wayland backend: EGL context + wlr-layer-shell surface.
+wayland_sources = []
+if get_option('enable_wayland')
+  add_project_arguments('-DGLAVA_WAYLAND', language: ['cpp', 'c'])
+
+  glava_dependencies += dependency('wayland-client')
+  glava_dependencies += dependency('wayland-egl')
+  glava_dependencies += dependency('egl')
+
+  wl_scanner = find_program('wayland-scanner')
+  wl_protos  = dependency('wayland-protocols')
+  wl_protos_dir = wl_protos.get_variable(pkgconfig: 'pkgdatadir')
+
+  if get_option('wlr_layer_shell_xml') != ''
+    layer_shell_xml = get_option('wlr_layer_shell_xml')
+  else
+    layer_shell_xml = meson.source_root() + '/glava/protocols/wlr-layer-shell-unstable-v1.xml'
+  endif
+  xdg_shell_xml = wl_protos_dir + '/stable/xdg-shell/xdg-shell.xml'
+
+  # Generate client glue with wayland-scanner. Output names match the #includes
+  # in glava/wayland_wcb.c. Adding the generated headers to the library sources
+  # makes Meson put the build directory on the include path automatically.
+  wayland_sources += custom_target('layer-shell-client-header',
+    input:   layer_shell_xml,
+    output:  'wlr-layer-shell-unstable-v1-client-protocol.h',
+    command: [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'])
+  wayland_sources += custom_target('layer-shell-private-code',
+    input:   layer_shell_xml,
+    output:  'wlr-layer-shell-unstable-v1-protocol.c',
+    command: [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'])
+  wayland_sources += custom_target('xdg-shell-client-header',
+    input:   xdg_shell_xml,
+    output:  'xdg-shell-client-protocol.h',
+    command: [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'])
+  wayland_sources += custom_target('xdg-shell-private-code',
+    input:   xdg_shell_xml,
+    output:  'xdg-shell-protocol.c',
+    command: [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'])
+endif
+
 if get_option('standalone')
   add_project_arguments('-DGLAVA_STANDALONE', language: ['cpp', 'c'])
 endif
@@ -87,7 +134,7 @@ glfft = static_library(
 libglava = shared_library(
   'glava',
   sources: run_command('find', 'glava', '-type', 'f', '-name', '*.c', '-print')
-           .stdout().strip().split('\n'),
+           .stdout().strip().split('\n') + wayland_sources,
   dependencies: glava_dependencies,
   install:      true)
 
