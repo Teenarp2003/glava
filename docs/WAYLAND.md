@@ -179,8 +179,12 @@ inline default.
 For a gradient fed from your pywal palette, color `bars.glsl` with two pipes:
 
 ```glsl
-#define COLOR mix(@low:#3366b2, @high:#a0a0b2, clamp(d / GRADIENT, 0, 1))
+#define COLOR mix(@low:#3366b2 , @high:#a0a0b2 , clamp(d / GRADIENT, 0, 1))
 ```
+
+The spaces before the commas are required: GLava's binding parser consumes the
+single character that ends a matched `@name` binding, so the argument separator
+must be whitespace (the comma then survives as the literal separator).
 
 launch with `glava --backend wayland --desktop --pipe="low:vec4" --pipe="high:vec4"`,
 and push lines like `low=#1d2021` / `high=#a89984` to its stdin whenever the theme

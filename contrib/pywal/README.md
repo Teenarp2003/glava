@@ -10,7 +10,8 @@ running system; copy them into place on your Hyprland machine as below.
 ## Files
 
 - `bars.glsl` - drop-in for `~/.config/glava/bars.glsl`; only the `COLOR` line
-  changed to `mix(@low:..., @high:..., ...)` (two live pipe colors).
+  changed to `mix(@low:... , @high:... , ...)` (two live pipe colors). The spaces
+  before the commas are required (see the note in that file).
 - `glava-pywal-update` - reads `~/.cache/wal/colors.json` and appends the colors
   to GLava's feed file.
 - `glava-pywal-start` - launches GLava reading the feed via `tail -f` with
