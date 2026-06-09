@@ -1,59 +1,129 @@
+**GLava** is a general-purpose, highly configurable OpenGL audio spectrum visualizer, originally developed by [jarcode-foss](https://github.com/jarcode-foss/glava).
 
-<img align="left" width="200" height="200" src="https://thumbs.gfycat.com/DefiantInformalIndianspinyloach-size_restricted.gif" />
+This is a fork of the original repo which adds native support for Wayland, with other features like live-color reload.
 
-**GLava** is a general-purpose, highly configurable OpenGL audio spectrum visualizer for X11. Displayed to the left is the `radial` shader module, or for a more extensive demonstration [see this demo](https://streamable.com/dgpj8). Development is active, and reporting issues is encouranged.
+**Wayland / Hyprland:** an experimental native Wayland backend (EGL + `wlr-layer-shell`) renders GLava as a click-through desktop-background layer on wlroots-based compositors such as Hyprland. Build with `-Denable_wayland=true`. 
 
-> **Wayland / Hyprland:** an experimental native Wayland backend (EGL + `wlr-layer-shell`) renders GLava as a click-through desktop-background layer on wlroots-based compositors such as Hyprland. Build with `-Denable_wayland=true`. See [docs/WAYLAND.md](docs/WAYLAND.md) for full build, usage, and uninstall instructions.
+## 1. Prerequisites
+You need a Linux machine running a wlroots-based compositor (this guide
+targets Hyprland).
+
+### Required packages
+
+> The `wlr-layer-shell-unstable-v1.xml` protocol file is **vendored** in this
+> repository (`glava/protocols/`), so you do **not** need `wlr-protocols`
+> installed. Only `wayland-protocols` (for `xdg-shell.xml`) and
+> `wayland-scanner` are required at build time.
+
+**Arch Linux :** 
+
+```bash
+sudo pacman -S --needed \
+    base-devel meson ninja git \
+    wayland wayland-protocols \
+    mesa libglvnd \
+    libpulse
+```
+
+**Debian / Ubuntu:**
+
+```bash
+sudo apt-get install -y \
+    build-essential meson ninja-build git pkg-config \
+    libwayland-dev wayland-protocols \
+    libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dev \
+    libpulse-dev
+```
 
 **Compiling:**
 
 ```bash
-$ git clone https://github.com/jarcode-foss/glava
+$ git clone https://github.com/Teenarp2003/glava
 $ cd glava
-$ meson build --prefix /usr
-$ ninja -C build
+$ meson setup build --prefix /usr -Denable_wayland=true -Ddisable_obs=true # Build with both X11 and Wayland support
+$ meson setup build --prefix /usr -Denable_wayland=true -Ddisable_glx=true -Ddisable_obs=true # Build with only the Wayland backend
+$ sudo ninja -C build
 $ sudo ninja -C build install
+$ sudo ldconfig
 ```
+
+> `-Ddisable_obs=true` is recommended because the (default-on) OBS plugin links
+> against Xlib and the OBS headers; omit it only if you actually want the OBS
+> plugin and have its dependencies installed. For a pure-Wayland build
+> (`-Ddisable_glx=true`) you should keep OBS disabled, otherwise Xlib is pulled
+> back in.
+
 
 You can pass `-Dbuildtype=debug` to Meson for debug builds of glava, and `-Dstandalone=true` to run glava directly from the `build` directory.
 
 Note that versions since `2.0` use Meson for the build system, although the `Makefile` will remain to work identically to earlier `1.xx` releases (with new features disabled). Package maintainers are encouraged to use Meson directly instead of the Make wrapper.
 
-**Requirements:**
-
-- X11 (Xext, Xcomposite, & Xrender)
-- PulseAudio
-- Linux or BSD
-- libBlocksRuntime if compiling with Clang
-
-**Configuration tool requirements:**
-
-- Lua (5.3 by default, change with `-Dlua_version=...`), and the following lua libraries:
-  - Lua GObject Introspection (LGI)
-  - LuaFilesystem (LFS)
-- GTK+ 3
-
-**Additional compile time requirements:**
-
-- Meson
-- OBS (disable with `-Ddisable_obs=true`)
-
-**Optional requirements:**
-
-- GLFW 3.1+ (optional, enable with `-Denable_glfw=true`)
-
-**Ubuntu/Debian users:** the following command ensures you have all the needed packages and headers to compile GLava with the default feature set:
-```bash
-sudo apt-get install libgl1-mesa-dev libpulse0 libpulse-dev libxext6 libxext-dev libxrender-dev libxcomposite-dev liblua5.3-dev liblua5.3 lua-lgi lua-filesystem libobs0 libobs-dev meson build-essential gcc 
-```
 Don't forget to run `sudo ldconfig` after installing.
 
-## Installation
-Some distributions have a package for `glava`. If your distribution is not listed please use the compilation instructions above.
+Currently this project is not yet available for direct installation through any package manager. Support for installation would be available soon.
 
-- Arch Linux [`glava` package](https://www.archlinux.org/packages/community/x86_64/glava/), or [`glava-git` AUR package](https://aur.archlinux.org/packages/glava-git/)
-- NixOS [package](https://github.com/NixOS/nixpkgs/blob/release-18.09/pkgs/applications/misc/glava/default.nix)
-- openSUSE [package](https://build.opensuse.org/package/show/X11:Utilities/glava)
+## Usage 
+
+The backend is auto-selected when `WAYLAND_DISPLAY` is set. You can also force it:
+
+```bash
+# Copy the default config the first time:
+glava --copy-config
+
+# Run (auto-detects Wayland), or force the backend explicitly:
+glava
+glava --backend wayland --verbose
+```
+For a desktop-background, click-through visualizer, make sure your config
+(`~/.config/glava/rc.glsl`) requests the desktop window type, e.g.:
+
+```glsl
+#request setxwintype "desktop"
+#request setclickthrough
+```
+
+On Wayland this maps to the `wlr-layer-shell` **background** layer with an empty
+input region (click-through). Transparency is native — no wallpaper-mirroring
+hack is required.
+
+### Optional: launch with Hyprland
+
+Add to `~/.config/hypr/hyprland.conf`:
+
+```conf
+exec-once = glava --backend wayland
+```
+### Live color updates
+
+GLava's pipe bindings let you drive colors live without restarting. The `bars`
+module color is `#define COLOR @fg:mix(...)`; the `@name:default` syntax uses the
+live uniform `_IN_name` when GLava is launched with `--pipe="name:vec4"`, else the
+inline default.
+
+For a gradient fed from your pywal palette, color `bars.glsl` with two pipes:
+
+```glsl
+#define COLOR mix(@low:#3366b2 , @high:#a0a0b2 , clamp(d / GRADIENT, 0, 1))
+```
+
+The spaces before the commas are required: GLava's binding parser consumes the
+single character that ends a matched `@name` binding, so the argument separator
+must be whitespace (the comma then survives as the literal separator).
+
+launch with `glava --backend wayland --pipe="low:vec4" --pipe="high:vec4"`
+(do **not** add `--desktop` — see the troubleshooting note below), and push lines
+like `low=#1d2021` / `high=#a89984` to its stdin whenever the theme changes. Ready-to-install scripts and a drop-in `bars.glsl` are in
+[contrib/pywal/](../contrib/pywal/) (see its `README.md`).
+
+```bash
+#Copy over the required files from repo to configuration directory:
+$ cp <GLava repo>/contrib/pywal/bars.glsl ~/.config/glava/bars.glsl
+# Run the start scripts from the glava directory. 
+$ ./contrib/pywal/glava-pywal-start
+# Use the glava-pywal-update script to update colors without restart. 
+$ ./contrib/pywal/glava-pywal-update
+```
+
 
 ## [Configuration](https://github.com/jarcode-foss/glava/wiki)
 
@@ -61,9 +131,63 @@ GLava will start by looking for an entry point in the user configuration folder 
 
 You should start by running `glava --copy-config`. This will copy over default configuration files and create symlinks to modules in your user config folder. GLava will either load system configuration files or the user provided ones, so it's not advised to copy these files selectively.
 
-To embed GLava in your desktop (for EWMH compliant window managers), run it with the `--desktop` flag and then position it accordingly with `#request setgeometry x y width height` in your `rc.glsl`.
+To embed GLava in your desktop (for EWMH/X11  window managers), run it with the `--desktop` flag and then position it accordingly with `#request setgeometry x y width height` in your `rc.glsl`.
 
 For more information, see the [main configuration page](https://github.com/jarcode-foss/glava/wiki).
+
+## 5. Uninstalling GLava 
+
+If GLava does not function as expected, here is how to fully remove the
+installed package and its files from your system. 
+
+### First: stop any running instance
+
+```bash
+pkill glava
+```
+
+Also remove the autostart line you may have added to
+`~/.config/hypr/hyprland.conf`:
+
+```conf
+# delete this line if present:
+exec-once = glava --backend wayland
+```
+
+### Method A — installation was done with `ninja install`  
+
+Meson records every installed file, so it can uninstall cleanly **as long as you
+still have the same `build/` directory** you installed from:
+
+```bash
+cd /path/to/glava
+sudo ninja -C build uninstall
+sudo ldconfig
+```
+
+`ninja uninstall` reads `build/meson-logs/install_log.txt` and deletes exactly
+the files it installed (binary, shared library, shaders, resources, headers,
+and the OBS plugin / lua modules if those were enabled).
+
+> Note: `ninja uninstall` removes files but not the (now-empty) directories it
+> created. Clean those up manually if you like (see Method C).
+
+### Method B — manual removal 
+
+If you no longer have the `build/` directory, delete the installed files by
+hand. With the **default** install prefix (`/usr`) and options, these are:
+
+```bash
+sudo rm -f  /usr/bin/glava
+sudo rm -f  /usr/bin/glava-config                 # only if config tool was built
+sudo rm -f  /usr/lib/libglava.so*                 # path may be /usr/lib64 or /usr/lib/x86_64-linux-gnu
+sudo rm -f  /usr/include/glava.h
+sudo rm -rf /etc/xdg/glava                         # installed shader/module system
+sudo rm -rf /usr/share/glava                       # generic resources
+sudo rm -rf /usr/share/lua/*/glava-config          # lua modules, if config tool was built
+sudo rm -f  /usr/lib/obs-plugins/libglava-obs.so   # only if OBS plugin was built
+sudo ldconfig
+```
 
 ## Desktop window compatibility
 
@@ -150,5 +274,6 @@ The below copyright notice applies for the original versions of these files:
 **The noted files above are all sublicensed under the terms of the GPLv3**. The MIT license is included for your convenience and to satisfy the requirements of the original license, although it no longer applies to any code in this repository. You will find the original copyright notice and MIT license in the `LICENSE_ORIGINAL` file for cava, or `glfft/LICENSE_ORIGINAL` for GLFFT.
 
 The below copyright applies for the modifications to the files listed above, and the remaining sources in the repository:
-
 `Copyright (c) 2017 Levi Webb`
+
+
