@@ -7,9 +7,8 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 feed="${XDG_RUNTIME_DIR:-/tmp}/glava-pywal.feed"
 
-# Start each session with a fresh feed, then seed the current colors.
+# Start each session with a fresh, empty feed.
 : > "$feed"
-"$here/glava-pywal-update" || true
 
 # Replace any existing instance.
 pkill -x glava 2>/dev/null || true
@@ -21,3 +20,10 @@ pkill -x glava 2>/dev/null || true
 # behavior comes from `#request setxwintype "desktop"` in rc.glsl instead.
 tail -n +1 -f "$feed" | glava --backend wayland \
     --pipe="low:vec4" --pipe="high:vec4" &
+
+# Seed the colors only AFTER GLava is up and consuming stdin. Pushing them
+# before startup races GLava's pipe reader and the values are dropped (the bars
+# fall back to the inline bars.glsl defaults). Delivering them as a live append
+# is the path that reliably applies.
+sleep 1
+"$here/glava-pywal-update" || true
