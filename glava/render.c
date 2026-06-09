@@ -1889,7 +1889,16 @@ bool rd_update(struct glava_renderer* r, float* lb, float* rb, size_t bsz, bool 
     /* Parse stdin data, if nessecary */
     if (!pipe_eof && (gl->stdin_type != STDIN_TYPE_NONE || gl->binds[0].name != NULL)) {
         int c, n, p;
-        setvbuf(stdin, NULL, _IOLBF, 64);
+        /* Must be unbuffered: this loop uses select() on STDIN_FILENO to decide
+           whether input is pending, but reads with getchar(). With a buffered
+           stream, the first getchar() drains the whole kernel pipe into stdio's
+           buffer, so subsequent select() calls report "no data" while complete
+           lines sit unread in the buffer. Since only one line is processed per
+           frame, a multi-line burst (e.g. `low=..\nhigh=..`) would leave every
+           line after the first stuck until the next write, applying stale/default
+           values. Unbuffered reads keep pending lines in the kernel pipe where
+           select() can see them. */
+        setvbuf(stdin, NULL, _IONBF, 0);
         
         fd_set fds;
         FD_ZERO(&fds);
