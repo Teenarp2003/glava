@@ -124,11 +124,22 @@ add_project_arguments(
   # '-fvisibility=hidden',
   language: ['cpp', 'c'])
 
+# Note: glfft is vendored C++ that predates GCC 13+/libstdc++ no longer pulling
+# in transitive standard headers. Force-include the headers it relies on so it
+# builds on modern toolchains (GCC 15+) without editing the vendored sources.
+glfft_cpp_args = [
+  '-include', 'stdint.h',
+  '-include', 'stdio.h',
+  '-include', 'stdarg.h',
+  '-include', 'string.h',
+  '-include', 'errno.h',
+  '-include', 'stdexcept'
+]
 glfft = static_library(
   'glfft',
   sources: run_command('find', 'glfft', '-type', 'f', '-name', '*.cpp', '-print')
            .stdout().strip().split('\n'),
-  c_args: ['-std=c++11'],
+  cpp_args: glfft_cpp_args,
   dependencies: [ cc.find_library('dl') ])
 
 libglava = shared_library(
