@@ -73,11 +73,12 @@ git clone <your-fork-or-this-repo> glava
 cd glava
 
 # Configure: enable the Wayland backend.
-# Keep the X11/GLX backend too (recommended) so the binary works on both:
-meson setup build -Denable_wayland=true -Ddisable_obs=true
+# Keep the X11/GLX backend too (recommended) so the binary works on both.
+# IMPORTANT: use --prefix /usr (see the note below).
+meson setup build --prefix /usr -Denable_wayland=true -Ddisable_obs=true
 
 # ...or build a pure-Wayland binary with no X11 dependency at all:
-# meson setup build -Denable_wayland=true -Ddisable_glx=true -Ddisable_obs=true
+# meson setup build --prefix /usr -Denable_wayland=true -Ddisable_glx=true -Ddisable_obs=true
 
 ninja -C build
 ```
@@ -95,6 +96,22 @@ To run directly from the build directory without installing, add
 sudo ninja -C build install
 sudo ldconfig
 ```
+
+> **Use `--prefix /usr`, not the default `/usr/local`.** GLava installs a shared
+> library (`libglava.so`). On many distros (notably **Arch**) `/usr/local/lib`
+> is *not* in the dynamic linker's search path, so a default-prefix install makes
+> `glava` fail at startup with:
+>
+> ```
+> glava: error while loading shared libraries: libglava.so: cannot open shared object file
+> ```
+>
+> Installing to `/usr` (where `/usr/lib` is always in the linker cache) avoids
+> this. If you already installed to `/usr/local`, either reinstall with
+> `meson configure build --prefix /usr && ninja -C build && sudo ninja -C build install && sudo ldconfig`
+> (clear the old copy first: `sudo rm -f /usr/local/bin/glava /usr/local/lib/libglava.so*`),
+> or teach the linker about it once:
+> `echo /usr/local/lib | sudo tee /etc/ld.so.conf.d/usrlocal.conf && sudo ldconfig`.
 
 ### Build flags reference
 
@@ -152,10 +169,32 @@ exec-once = glava --backend wayland
 - The visualizer reacts to audio.
 - Transparent areas show the wallpaper (compositor alpha blending).
 
+### Live colors from pywal
+
+GLava's pipe bindings let you drive colors live without restarting. The `bars`
+module color is `#define COLOR @fg:mix(...)`; the `@name:default` syntax uses the
+live uniform `_IN_name` when GLava is launched with `--pipe="name:vec4"`, else the
+inline default.
+
+For a gradient fed from your pywal palette, color `bars.glsl` with two pipes:
+
+```glsl
+#define COLOR mix(@low:#3366b2, @high:#a0a0b2, clamp(d / GRADIENT, 0, 1))
+```
+
+launch with `glava --backend wayland --desktop --pipe="low:vec4" --pipe="high:vec4"`,
+and push lines like `low=#1d2021` / `high=#a89984` to its stdin whenever the theme
+changes. Ready-to-install scripts and a drop-in `bars.glsl` are in
+[contrib/pywal/](../contrib/pywal/) (see its `README.md`).
+
 ---
 
 ## 4. Troubleshooting
 
+- **`error while loading shared libraries: libglava.so`** — you installed with
+  the default `/usr/local` prefix, which isn't in the linker path on some distros
+  (e.g. Arch). Reinstall with `--prefix /usr` (see section 2), or add
+  `/usr/local/lib` to `/etc/ld.so.conf.d/` and run `sudo ldconfig`.
 - **`wayland-scanner: command not found`** — install `wayland` (Arch) or
   `wayland-protocols` + the `wayland-scanner` binary (it ships with
   `libwayland-bin` on some distros).

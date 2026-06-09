@@ -13,9 +13,11 @@ See [WAYLAND.md](WAYLAND.md) for full build/uninstall details.
 
 ## Build
 
-- [ ] Configure (hybrid X11 + Wayland, OBS off):
-      `meson setup build -Denable_wayland=true -Ddisable_obs=true`
+- [ ] Configure (hybrid X11 + Wayland, OBS off). Use `--prefix /usr`:
+      `meson setup build --prefix /usr -Denable_wayland=true -Ddisable_obs=true`
       - For a pure-Wayland binary add `-Ddisable_glx=true`
+      - `--prefix /usr` matters: a default `/usr/local` install can fail with
+        `libglava.so: cannot open shared object file` (not in the linker path on Arch)
 - [ ] Compile: `ninja -C build`
 - [ ] Install: `sudo ninja -C build install && sudo ldconfig`
       - Or use `-Dstandalone=true` to run from `build/` without installing
