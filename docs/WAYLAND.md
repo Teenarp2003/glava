@@ -186,9 +186,9 @@ The spaces before the commas are required: GLava's binding parser consumes the
 single character that ends a matched `@name` binding, so the argument separator
 must be whitespace (the comma then survives as the literal separator).
 
-launch with `glava --backend wayland --desktop --pipe="low:vec4" --pipe="high:vec4"`,
-and push lines like `low=#1d2021` / `high=#a89984` to its stdin whenever the theme
-changes. Ready-to-install scripts and a drop-in `bars.glsl` are in
+launch with `glava --backend wayland --pipe="low:vec4" --pipe="high:vec4"`
+(do **not** add `--desktop` — see the troubleshooting note below), and push lines
+like `low=#1d2021` / `high=#a89984` to its stdin whenever the theme changes. Ready-to-install scripts and a drop-in `bars.glsl` are in
 [contrib/pywal/](../contrib/pywal/) (see its `README.md`).
 
 ---
@@ -209,6 +209,12 @@ changes. Ready-to-install scripts and a drop-in `bars.glsl` are in
 - **Black/opaque background** — your config likely isn't transparent; confirm
   `setxwintype "desktop"` and that the EGL alpha config was selected
   (run with `--verbose`).
+- **Visualizer is small and rendered *above* your windows** — you launched with
+  `--desktop`. On Wayland that enables GLava's X11/EWMH desktop auto-detection and
+  `env_*.glsl` presets, which take the surface off the background layer. Drop
+  `--desktop` and set `#request setxwintype "desktop"` in `rc.glsl` instead; the
+  backend maps that window type to the wlr-layer-shell **background** layer (full
+  output size, below windows).
 - **Nothing reacts to audio** — unrelated to the backend; check the PulseAudio /
   PipeWire source with `--audio` / `setsource`.
 
