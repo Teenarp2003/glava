@@ -269,18 +269,26 @@ static void* create_and_bind(const char* name, const char* class,
     }
     zwlr_layer_surface_v1_add_listener(w->layer_surface, &layer_surface_listener, w);
 
-    if (w->width > 0 && w->height > 0) {
+    /* A desktop-background visualizer should cover the whole monitor, so the
+       background layer always fills its output and ignores `setgeometry` (the
+       default config requests 800x600, which would otherwise leave it as a
+       small region in the corner). Other layers honor an explicit size. */
+    bool fill = layer == ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND
+                || w->width <= 0 || w->height <= 0;
+    if (fill) {
+        zwlr_layer_surface_v1_set_anchor(w->layer_surface,
+            ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP    | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
+            ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT   | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+        zwlr_layer_surface_v1_set_size(w->layer_surface, 0, 0);
+        /* Let the compositor's configure event provide the real output size. */
+        w->width  = 0;
+        w->height = 0;
+    } else {
         /* Positioned, fixed-size surface anchored to the top-left corner. */
         zwlr_layer_surface_v1_set_size(w->layer_surface, w->width, w->height);
         zwlr_layer_surface_v1_set_anchor(w->layer_surface,
             ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
         zwlr_layer_surface_v1_set_margin(w->layer_surface, y, 0, 0, x);
-    } else {
-        /* Fill the whole output. */
-        zwlr_layer_surface_v1_set_anchor(w->layer_surface,
-            ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP    | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
-            ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT   | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
-        zwlr_layer_surface_v1_set_size(w->layer_surface, 0, 0);
     }
     zwlr_layer_surface_v1_set_keyboard_interactivity(
         w->layer_surface, ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE);
